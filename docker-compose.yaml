@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  webhook:
+    build: 
+      context: .
+      args:
+        - SCRIPT_NAME=app.py
+    ports:
+      - "5003:5003"
+    command: python -u app.py

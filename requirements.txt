@@ -3,3 +3,4 @@ webdriver_manager
 nltk
 python-dotenv
 anthropic
+Flask
