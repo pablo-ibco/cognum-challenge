@@ -1,3 +1,4 @@
+from flask import Flask, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -13,9 +14,10 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-
 nltk.download('vader_lexicon')
 nltk.download('punkt')
+
+app = Flask(__name__)
 
 bbc_url = os.getenv('BBC_URL')
 section_selector = os.getenv('SECTION_SELECTOR')
@@ -31,12 +33,17 @@ relevant_headline_prompt = os.getenv('RELEVANT_HEADLINE_PROMPT')
 
 
 def get_top_headlines():
+
+    main_headlines = []
+    other_news = []
+    
     try:
         print("Initializing WebDriver...")
         chrome_options = Options()
         chrome_options.add_argument("--incognito")
         chrome_options.add_argument("--headless")
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        time.sleep(10)
         driver.get(bbc_url)
         print(f"Page loaded: {bbc_url}")
         
@@ -44,9 +51,6 @@ def get_top_headlines():
         
         sections = driver.find_elements(By.CSS_SELECTOR, section_selector)
         print(f"Found {len(sections)} sections to process.")
-
-        main_headlines = []
-        other_news = []
 
         for section in sections:
             try:
@@ -74,11 +78,10 @@ def get_top_headlines():
         
         print(f"Extracted {len(main_headlines)} headlines.")
         print(f"Extracted {len(other_news)} other news items.")
-    except Exception as e:
-        print(f"An error occurred during the scraping process: {e}")
-    finally:
-        print("Closing WebDriver... \n")
         driver.quit()
+        print("Closing WebDriver... \n")
+    except Exception as e:
+        print(f"An error occurred during the scraping process: {e}")        
     
     return {'headlines': main_headlines, 'other_news': other_news}
 
@@ -171,17 +174,25 @@ def score_summary(summary):
 
     return round(score, 2)
 
-def main():
+@app.route('/api/headlines', methods=['GET'])
+def get_headlines():
     headlines = get_top_headlines()
     save_headlines_to_json(headlines)
-    print(f"{headlines['headlines']}")
+    return jsonify(headlines)
+
+@app.route('/api/relevant-headlines', methods=['GET'])
+def get_relevant_headlines():
+    headlines = get_top_headlines()
     relevant_headlines = is_relevant_headline(headlines['headlines'])
-    
+    return jsonify(relevant_headlines)
+
+@app.route('/api/summaries', methods=['GET'])
+def get_summaries():
+    headlines = get_top_headlines()
+    relevant_headlines = is_relevant_headline(headlines['headlines'])
     summaries = []
     for headline in relevant_headlines:
-        print(f"\n Extracting content from article: {headline['title']}")
         content = get_article_content(headline['link'])
-        print(f"\n Content from Article: {content} \n")
         summary = summarize_content(content)
         summaries.append({
             'title': headline['title'],
@@ -189,35 +200,36 @@ def main():
             'link': headline['link'],
             'summary': summary
         })
-    
-    print(f"\n \n Summaries: {summaries}")
-
-    ranked_by_lenght_summaries = rank_summaries(summaries)
-    
+    ranked_by_length_summaries = rank_summaries(summaries)
     result = {
-        'top_ranked_bbc_news': ranked_by_lenght_summaries
+        'top_ranked_bbc_news': ranked_by_length_summaries
     }
-    
     with open('news_summaries.json', 'w') as f:
         json.dump(result, f, indent=4)
-    
-    print(f"\n Saved {len(ranked_by_lenght_summaries)} summaries to news_summaries.json")
+    return jsonify(result)
 
-    analyzed_news = analyze_news(ranked_by_lenght_summaries)
-
-    for news in analyzed_news:
-        print(f"\nTitle: {news['title']}")
-        print(f"Sentiment: {news['sentiment']}")
-        print(f"Quality Score: {news['score']}")
-
+@app.route('/api/analyzed-news', methods=['GET'])
+def get_analyzed_news():
+    headlines = get_top_headlines()
+    relevant_headlines = is_relevant_headline(headlines['headlines'])
+    summaries = []
+    for headline in relevant_headlines:
+        content = get_article_content(headline['link'])
+        summary = summarize_content(content)
+        summaries.append({
+            'title': headline['title'],
+            'description': headline['description'],
+            'link': headline['link'],
+            'summary': summary
+        })
+    ranked_by_length_summaries = rank_summaries(summaries)
+    analyzed_news = analyze_news(ranked_by_length_summaries)
     result_analyzed = {
         'top_ranked_bbc_news_with_score': analyzed_news
     }
-    
     with open('news_summaries_scored.json', 'w') as f:
         json.dump(result_analyzed, f, indent=4)
-    
-    print(f"\n Saved {len(analyzed_news)} scored summaries to news_summaries_scored.json")
+    return jsonify(result_analyzed)
 
 if __name__ == '__main__':
-    main()
+    app.run(debug=True, host='0.0.0.0', port=5003)
