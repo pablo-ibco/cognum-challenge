@@ -4,6 +4,8 @@ This Python script automates the process of fetching, summarizing, and analyzing
 
 Utilizing a combination of Selenium for web scraping, NLTK for sentiment analysis, and the Anthropic API for content summarization, this script showcases a streamlined approach to news content processing and analysis.
 
+- Demo video: https://www.loom.com/share/5490564eb3fa4498b1f1d8fe53364b56?sid=c09a0527-6e5a-4f35-94f6-1a5b678a7213 
+
 ## Overview: How the Script Meets the Challenge
 
 The script adeptly meets the specified challenge by executing a series of well-defined tasks:
